@@ -1,7 +1,192 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Bell } from '@element-plus/icons-vue'
+
+const router = useRouter()
+const route = useRoute()
+
+const activeMenu = computed(() => route.path)
+
+const menuItems = [
+  { path: '/', title: '首页概览', icon: 'Odometer' },
+  { path: '/monitor', title: '动态监控', icon: 'Monitor' },
+  { path: '/console', title: '日志控制台', icon: 'Document' },
+  { path: '/device', title: '设备管理', icon: 'Cpu' },
+]
+
+function handleMenuSelect(path: string) {
+  if (path === '/device') {
+    ElMessage.info('功能开发中，敬请期待')
+    return
+  }
+  router.push(path)
+}
+
+function handleAlarm() {
+  ElMessage.info('告警中心功能开发中')
+}
+
+function handleUserCommand(cmd: string) {
+  if (cmd === 'login') {
+    ElMessageBox.prompt('请输入登录令牌', '账号登录', {
+      confirmButtonText: '登录',
+      cancelButtonText: '取消',
+    }).then(({ value }) => {
+      if (value) {
+        localStorage.setItem('mp_token', value)
+        ElMessage.success('登录成功')
+      }
+    }).catch(() => {})
+  } else if (cmd === 'logout') {
+    localStorage.removeItem('mp_token')
+    ElMessage.success('已退出登录')
+  }
+}
 </script>
 
 <template>
-  <HelloWorld />
+  <el-container class="app-layout">
+    <el-header class="app-header">
+      <div class="header-left">
+        <div class="logo" @click="router.push('/')">
+          <el-icon :size="28" color="var(--mp-primary)"><Cpu /></el-icon>
+          <span class="logo-text">home-pilot</span>
+        </div>
+        <el-menu
+          :default-active="activeMenu"
+          mode="horizontal"
+          class="header-menu"
+          @select="handleMenuSelect"
+        >
+          <el-menu-item
+            v-for="item in menuItems"
+            :key="item.path"
+            :index="item.path"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.title }}</span>
+          </el-menu-item>
+        </el-menu>
+      </div>
+      <div class="header-right">
+        <el-badge :value="3" :max="99" class="alarm-badge">
+          <el-button :icon="Bell" circle @click="handleAlarm" />
+        </el-badge>
+        <el-dropdown @command="handleUserCommand">
+          <div class="user-avatar">
+            <el-avatar :size="36" class="avatar-img">
+              <el-icon :size="20"><User /></el-icon>
+            </el-avatar>
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="login">
+                <el-icon><Login /></el-icon>账号登录
+              </el-dropdown-item>
+              <el-dropdown-item command="logout" divided>
+                <el-icon><SwitchButton /></el-icon>退出登录
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+    </el-header>
+
+    <el-main class="app-main">
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
+    </el-main>
+  </el-container>
 </template>
+
+<style scoped>
+.app-layout {
+  min-height: 100vh;
+  background: var(--mp-bg);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--mp-card-bg);
+  border-bottom: 1px solid var(--mp-border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  padding: 0 24px;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--mp-primary);
+  letter-spacing: -0.5px;
+}
+
+.header-menu {
+  border-bottom: none !important;
+  background: transparent;
+}
+
+.header-menu .el-menu-item {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mp-text-secondary);
+  border-color: var(--mp-primary) !important;
+}
+
+.header-menu .el-menu-item.is-active {
+  color: var(--mp-primary) !important;
+  background-color: transparent !important;
+}
+
+.header-menu .el-menu-item:hover {
+  color: var(--mp-primary) !important;
+  background-color: transparent !important;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.alarm-badge :deep(.el-badge__content) {
+  background-color: var(--mp-danger);
+}
+
+.user-avatar {
+  cursor: pointer;
+}
+
+.avatar-img {
+  background: var(--mp-primary-light);
+  color: #fff;
+}
+
+.app-main {
+  padding: 0;
+}
+</style>

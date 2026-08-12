@@ -1,0 +1,16 @@
+:root {
+  --mp-primary: #7BA39E;
+  --mp-primary-light: #A3C4BF;
+  --mp-primary-dark: #5B8A84;
+  --mp-secondary: #8E9AAF;
+  --mp-bg: #F5F5F0;
+  --mp-card-bg: #FFFFFF;
+  --mp-text-primary: #4A4A4A;
+  --mp-text-secondary: #8C8C8C;
+  --mp-border: #E8E8E3;
+  --mp-success: #A3B18A;
+  --mp-warning: #D4A373;
+  --mp-danger: #C17B7B;
+  --mp-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --mp-radius: 12px;
+}
