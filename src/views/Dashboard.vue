@@ -3,19 +3,22 @@ import { computed } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import { getComfortLevel, getTrend } from '../utils/format'
 
-const { data, isMock } = useWebSocket()
+const { data, isMock, onlineCount } = useWebSocket()
 
 const deviceId = 'esp32-S3-001'
-const isOnline = computed(() => data.value?.status === 'online')
+const isOnline = computed(() => (data.value?.device?.deviceStatus ?? 0) === 1)
+
+const tempAht = computed(() => data.value?.data?.tempAht ?? 0)
+const tempBmp = computed(() => data.value?.device?.tempBmp ?? 0)
 
 const avgTemp = computed(() => {
   if (!data.value) return '--'
-  return ((data.value.aht20Temp + data.value.bmp280Temp) / 2).toFixed(1)
+  return ((tempAht.value + tempBmp.value) / 2).toFixed(1)
 })
 
 const tempTrend = computed(() => {
   if (!data.value) return 'stable'
-  return getTrend([data.value.aht20Temp, data.value.bmp280Temp])
+  return getTrend([tempAht.value, tempBmp.value])
 })
 
 const trendIcon = computed(() => {
@@ -30,10 +33,10 @@ const trendColor = computed(() => {
   return 'var(--mp-success)'
 })
 
-const humidity = computed(() => data.value?.humidity ?? 0)
+const humidity = computed(() => data.value?.data?.humidity ?? 0)
 const comfortLevel = computed(() => getComfortLevel(humidity.value))
-const pressure = computed(() => data.value?.pressure ?? 0)
-const altitude = computed(() => data.value?.altitude ?? 0)
+const pressure = computed(() => data.value?.data?.pressureHpa ?? 0)
+const altitude = computed(() => data.value?.data?.altitude ?? 0)
 </script>
 
 <template>
@@ -68,8 +71,8 @@ const altitude = computed(() => data.value?.altitude ?? 0)
             </el-icon>
           </div>
           <div class="data-sub">
-            AHT20: {{ data?.aht20Temp?.toFixed(1) ?? '--' }}°C |
-            BMP280: {{ data?.bmp280Temp?.toFixed(1) ?? '--' }}°C
+            AHT20: {{ tempAht.toFixed(1) }}°C |
+            BMP280: {{ tempBmp.toFixed(1) }}°C
           </div>
         </div>
       </el-col>
@@ -103,6 +106,21 @@ const altitude = computed(() => data.value?.altitude ?? 0)
             <span class="unit">hPa</span>
           </div>
           <div class="data-sub">海拔约 {{ altitude.toFixed(0) }} m</div>
+        </div>
+      </el-col>
+
+      <el-col :xs="24" :sm="12" :md="6">
+        <div class="mp-card data-card">
+          <div class="card-label">在线设备数</div>
+          <div class="data-value">
+            <span class="big-num">{{ onlineCount }}</span>
+            <span class="unit">台</span>
+          </div>
+          <div class="data-sub">
+            <el-tag :type="onlineCount > 0 ? 'success' : 'danger'" effect="plain" round size="small">
+              {{ onlineCount > 0 ? '正常运行' : '无设备在线' }}
+            </el-tag>
+          </div>
         </div>
       </el-col>
     </el-row>

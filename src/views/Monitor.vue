@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { useWebSocket } from '../composables/useWebSocket'
+import { getDeviceHistory } from '../api/device'
 
 const { data, isMock } = useWebSocket()
 
@@ -10,23 +11,65 @@ const pressureChartRef = ref<HTMLElement>()
 let tempHumidChart: echarts.ECharts | null = null
 let pressureChart: echarts.ECharts | null = null
 
-const MAX_POINTS = 20
+const DEVICE_ID = 'esp32-S3-001'
+const MAX_POINTS = 50
+const timeRange = ref('1h')
+
 const timeLabels = ref<string[]>([])
 const aht20Temps = ref<number[]>([])
 const bmp280Temps = ref<number[]>([])
 const humidities = ref<number[]>([])
 const pressures = ref<number[]>([])
 
-function pushData(payload: NonNullable<typeof data.value>) {
-  const time = new Date(payload.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
+/** 加载历史数据 */
+async function loadHistoryData(range: string = '1h') {
+  const endTime = Date.now()
+  const rangeMap: Record<string, number> = {
+    '10m': 600_000,
+    '1h': 3_600_000,
+    '6h': 21_600_000,
+    '24h': 86_400_000,
+  }
+  const startTime = endTime - (rangeMap[range] || 3_600_000)
+
+  try {
+    const res = await getDeviceHistory(DEVICE_ID, startTime, endTime)
+    const historyPoints = res.data.data
+
+    if (historyPoints && historyPoints.length > 0) {
+      timeLabels.value = historyPoints.map(p =>
+        new Date(p.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
+      )
+      aht20Temps.value = historyPoints.map(p => p.tempAht)
+      bmp280Temps.value = historyPoints.map(p => p.tempBmp)
+      humidities.value = historyPoints.map(p => p.humidity)
+      pressures.value = historyPoints.map(p => p.pressureHpa)
+    } else {
+      // 无历史数据，清空
+      timeLabels.value = []
+      aht20Temps.value = []
+      bmp280Temps.value = []
+      humidities.value = []
+      pressures.value = []
+    }
+    updateCharts()
+  } catch {
+    // 接口不可用时保持空图表，等待WS实时数据填充
+  }
+}
+
+/** WS实时数据追加到图表 */
+function pushData(msg: NonNullable<typeof data.value>) {
+  const time = new Date(msg.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
 
   timeLabels.value.push(time)
-  aht20Temps.value.push(payload.aht20Temp)
-  bmp280Temps.value.push(payload.bmp280Temp)
-  humidities.value.push(payload.humidity)
-  pressures.value.push(payload.pressure)
+  aht20Temps.value.push(msg.data.tempAht)
+  bmp280Temps.value.push(msg.device.tempBmp)
+  humidities.value.push(msg.data.humidity)
+  pressures.value.push(msg.data.pressureHpa)
 
-  if (timeLabels.value.length > MAX_POINTS) {
+  // 保留最近MAX_POINTS个点
+  while (timeLabels.value.length > MAX_POINTS) {
     timeLabels.value.shift()
     aht20Temps.value.shift()
     bmp280Temps.value.shift()
@@ -186,6 +229,7 @@ onMounted(() => {
     initTempHumidChart()
     initPressureChart()
   })
+  loadHistoryData('1h')
   window.addEventListener('resize', handleResize)
 })
 
@@ -202,7 +246,15 @@ onUnmounted(() => {
   <div class="page-container">
     <div class="monitor-header">
       <h2 class="page-title">动态监控</h2>
-      <el-tag v-if="isMock" type="warning" effect="plain" round>Mock 模式</el-tag>
+      <div class="header-actions">
+        <el-radio-group v-model="timeRange" size="small" @change="loadHistoryData(timeRange)">
+          <el-radio-button value="10m">10分钟</el-radio-button>
+          <el-radio-button value="1h">1小时</el-radio-button>
+          <el-radio-button value="6h">6小时</el-radio-button>
+          <el-radio-button value="24h">24小时</el-radio-button>
+        </el-radio-group>
+        <el-tag v-if="isMock" type="warning" effect="plain" round>Mock 模式</el-tag>
+      </div>
     </div>
 
     <el-row :gutter="20">
@@ -231,6 +283,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .page-title {

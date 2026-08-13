@@ -30,3 +30,23 @@ export function getTrend(arr: number[]): 'up' | 'down' | 'stable' {
   if (diff < -0.3) return 'down'
   return 'stable'
 }
+
+/** 格式化设备状态 */
+export function formatDeviceStatus(status: number): { text: string; type: 'success' | 'danger' } {
+  return status === 1
+    ? { text: '在线', type: 'success' }
+    : { text: '离线', type: 'danger' }
+}
+
+/** 格式化传感器状态 */
+export function formatSensorStatus(status: number): { text: string; type: 'success' | 'danger' } {
+  return status === 1
+    ? { text: '正常', type: 'success' }
+    : { text: '异常', type: 'danger' }
+}
+
+/** 格式化完整时间戳 */
+export function formatFullTime(ts: number): string {
+  const d = new Date(ts)
+  return d.toLocaleString('zh-CN', { hour12: false })
+}

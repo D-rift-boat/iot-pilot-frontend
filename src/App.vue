@@ -3,11 +3,23 @@ import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Bell } from '@element-plus/icons-vue'
+import { useWebSocket } from './composables/useWebSocket'
 
 const router = useRouter()
 const route = useRoute()
 
+const { data: realtimeData, connectionState, onlineCount } = useWebSocket()
+
 const activeMenu = computed(() => route.path)
+
+const connectionLabel = computed(() => {
+  switch (connectionState.value) {
+    case 'connected': return '已连接'
+    case 'connecting': return '连接中...'
+    case 'reconnecting': return '重连中...'
+    default: return '未连接'
+  }
+})
 
 const menuItems = [
   { path: '/', title: '首页概览', icon: 'Odometer' },
@@ -17,10 +29,6 @@ const menuItems = [
 ]
 
 function handleMenuSelect(path: string) {
-  if (path === '/device') {
-    ElMessage.info('功能开发中，敬请期待')
-    return
-  }
   router.push(path)
 }
 
@@ -93,6 +101,34 @@ function handleUserCommand(cmd: string) {
         </el-dropdown>
       </div>
     </el-header>
+
+    <!-- 实时数据横条 -->
+    <div class="realtime-bar">
+      <div class="realtime-item">
+        <span class="realtime-label">温度</span>
+        <span class="realtime-value">{{ realtimeData?.data.tempAht?.toFixed(1) ?? '--' }}°C</span>
+      </div>
+      <div class="realtime-item">
+        <span class="realtime-label">湿度</span>
+        <span class="realtime-value">{{ realtimeData?.data.humidity?.toFixed(1) ?? '--' }}%</span>
+      </div>
+      <div class="realtime-item">
+        <span class="realtime-label">气压</span>
+        <span class="realtime-value">{{ realtimeData?.data.pressureHpa?.toFixed(1) ?? '--' }} hPa</span>
+      </div>
+      <div class="realtime-item">
+        <span class="realtime-label">海拔</span>
+        <span class="realtime-value">{{ realtimeData?.data.altitude?.toFixed(0) ?? '--' }} m</span>
+      </div>
+      <div class="realtime-item">
+        <span class="realtime-label">在线设备</span>
+        <span class="realtime-value highlight">{{ onlineCount }} 台</span>
+      </div>
+      <div class="realtime-item">
+        <span class="status-dot" :class="connectionState === 'connected' ? 'online' : 'offline'"></span>
+        <span class="realtime-label">{{ connectionLabel }}</span>
+      </div>
+    </div>
 
     <el-main class="app-main">
       <router-view v-slot="{ Component }">
@@ -188,5 +224,53 @@ function handleUserCommand(cmd: string) {
 
 .app-main {
   padding: 0;
+}
+
+/* 实时数据横条 */
+.realtime-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 24px;
+  background: linear-gradient(90deg, var(--mp-primary-dark), var(--mp-primary));
+  color: #fff;
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+.realtime-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.realtime-label {
+  opacity: 0.85;
+}
+
+.realtime-value {
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.realtime-value.highlight {
+  color: #FFE4A0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.online {
+  background: #A3B18A;
+  box-shadow: 0 0 6px #A3B18A;
+}
+
+.status-dot.offline {
+  background: #C17B7B;
+  box-shadow: 0 0 6px #C17B7B;
 }
 </style>

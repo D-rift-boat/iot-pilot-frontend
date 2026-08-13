@@ -1,16 +1,27 @@
-export function randomInRange(min: number, max: number, decimals = 1): number {
+import type { RealTimeDataMessage } from '../api/types/device'
+
+export function randomInRange(min: number, max: number, decimals = 2): number {
   return parseFloat((Math.random() * (max - min) + min).toFixed(decimals))
 }
 
-export function generateMockPayload(deviceId: string) {
+/** 生成符合后端REAL_TIME_DATA格式的Mock数据 */
+export function generateMockRealTimeData(deviceId: string): RealTimeDataMessage {
   return {
-    deviceId,
+    type: 'REAL_TIME_DATA',
+    data: {
+      tempAht: randomInRange(23, 29),
+      humidity: randomInRange(40, 70),
+      pressureHpa: randomInRange(985, 1020),
+      altitude: randomInRange(-30, 55, 0),
+      onlineCount: 1,
+    },
+    device: {
+      deviceId,
+      deviceStatus: 1,
+      aht20Status: 1,
+      bmp280Status: 1,
+      tempBmp: randomInRange(23.5, 30),
+    },
     timestamp: Date.now(),
-    aht20Temp: randomInRange(23, 29),
-    bmp280Temp: randomInRange(23.5, 30),
-    humidity: randomInRange(40, 70),
-    pressure: randomInRange(1010, 1020),
-    altitude: randomInRange(35, 55, 0),
-    status: 'online' as const,
   }
 }
