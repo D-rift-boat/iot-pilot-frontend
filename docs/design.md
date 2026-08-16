@@ -8,7 +8,7 @@
 | **定位** | 物联网（IoT）设备监控与管理前端系统 |
 | **技术栈** | Vue 3 (`<script setup>`) + Vue Router 4 + Element Plus + ECharts 5 + TypeScript |
 | **构建工具** | Vite 8 |
-| **后端地址** | `http://localhost:8080`（WebSocket: `ws://localhost:8080/ws/device`） |
+| **后端地址** | `http://localhost:8080`（WebSocket: `ws://localhost:8080/ws`） |
 | **视觉风格** | 莫兰迪（Morandi）高级灰调，低饱和度绿/蓝灰主色，圆角卡片 + 微阴影 |
 
 ---
@@ -86,7 +86,7 @@ src/
 
 ### 5.1 WebSocket & Mock 降级
 
-- 尝试连接 `ws://localhost:8080/ws/device?deviceId=esp32-S3-001`
+- 尝试连接 `ws://localhost:8080/ws?deviceId=esp32-S3-001`
 - 连接成功 → 接收实时数据
 - 连接失败/5s超时 → 启动 Mock（5秒定时器生成随机数据）
 - 组件卸载 → 清理 ws + timer

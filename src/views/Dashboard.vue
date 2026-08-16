@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import { getComfortLevel, getTrend } from '../utils/format'
 
-const { data, isMock, onlineCount } = useWebSocket()
+const { data, isMock, iotDeviceOnlineCount } = useWebSocket()
 
 const deviceId = 'esp32-S3-001'
 const isOnline = computed(() => (data.value?.device?.deviceStatus ?? 0) === 1)
@@ -113,12 +113,12 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
         <div class="mp-card data-card">
           <div class="card-label">在线设备数</div>
           <div class="data-value">
-            <span class="big-num">{{ onlineCount }}</span>
+            <span class="big-num">{{ iotDeviceOnlineCount }}</span>
             <span class="unit">台</span>
           </div>
           <div class="data-sub">
-            <el-tag :type="onlineCount > 0 ? 'success' : 'danger'" effect="plain" round size="small">
-              {{ onlineCount > 0 ? '正常运行' : '无设备在线' }}
+            <el-tag :type="iotDeviceOnlineCount > 0 ? 'success' : 'danger'" effect="plain" round size="small">
+              {{ iotDeviceOnlineCount > 0 ? '正常运行' : '无设备在线' }}
             </el-tag>
           </div>
         </div>

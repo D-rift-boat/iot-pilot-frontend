@@ -32,7 +32,7 @@ export function sendDeviceCommand(deviceId: string, cmd: DeviceCommand) {
 
 /** 获取在线设备数 */
 export function getOnlineCount() {
-  return request.get<ApiResponse<number>>('/device/onlineCount')
+  return request.get<ApiResponse<number>>('/device/iotDeviceOnlineCount')
 }
 
 /** 查询日志列表 */

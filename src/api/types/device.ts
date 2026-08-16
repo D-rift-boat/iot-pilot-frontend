@@ -43,7 +43,7 @@ export interface RealTimeDataMessage {
     humidity: number
     pressureHpa: number
     altitude: number
-    onlineCount: number
+    iotDeviceOnlineCount: number
   }
   device: {
     deviceId: string
@@ -63,7 +63,7 @@ export interface HomePilotRealtime {
   humidity: number
   pressureHpa: number
   altitude: number
-  onlineCount: number
+  iotDeviceOnlineCount: number
 }
 
 // ---------- 设备管理 ----------

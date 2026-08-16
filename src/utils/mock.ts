@@ -13,7 +13,7 @@ export function generateMockRealTimeData(deviceId: string): RealTimeDataMessage 
       humidity: randomInRange(40, 70),
       pressureHpa: randomInRange(985, 1020),
       altitude: randomInRange(-30, 55, 0),
-      onlineCount: 1,
+      iotDeviceOnlineCount: 1,
     },
     device: {
       deviceId,

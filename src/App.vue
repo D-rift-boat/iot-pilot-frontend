@@ -8,7 +8,7 @@ import { useWebSocket } from './composables/useWebSocket'
 const router = useRouter()
 const route = useRoute()
 
-const { data: realtimeData, connectionState, onlineCount } = useWebSocket()
+const { data: realtimeData, connectionState, iotDeviceOnlineCount, userDeviceOnlineCount } = useWebSocket()
 
 const activeMenu = computed(() => route.path)
 
@@ -121,8 +121,12 @@ function handleUserCommand(cmd: string) {
         <span class="realtime-value">{{ realtimeData?.data.altitude?.toFixed(0) ?? '--' }} m</span>
       </div>
       <div class="realtime-item">
-        <span class="realtime-label">在线设备</span>
-        <span class="realtime-value highlight">{{ onlineCount }} 台</span>
+        <span class="realtime-label">在线iot设备</span>
+        <span class="realtime-value highlight">{{ iotDeviceOnlineCount }} 台</span>
+      </div>
+      <div class="realtime-item">
+        <span class="realtime-label">在线用户设备</span>
+        <span class="realtime-value highlight">{{ userDeviceOnlineCount }} 台</span>
       </div>
       <div class="realtime-item">
         <span class="status-dot" :class="connectionState === 'connected' ? 'online' : 'offline'"></span>
