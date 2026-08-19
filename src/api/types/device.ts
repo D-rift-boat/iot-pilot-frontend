@@ -44,6 +44,7 @@ export interface RealTimeDataMessage {
     pressureHpa: number
     altitude: number
     iotDeviceOnlineCount: number
+    userDeviceOnlineCount: number
   }
   device: {
     deviceId: string

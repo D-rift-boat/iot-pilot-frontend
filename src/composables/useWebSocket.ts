@@ -6,7 +6,7 @@ import { generateMockRealTimeData } from '../utils/mock'
 const WS_URL = 'ws://localhost:8080/ws'
 const USER_DEVICE_ID = 'laptop'
 const USER_ID = 'admin'
-const HEARTBEAT_INTERVAL = 1_000     // 30s心跳
+const HEARTBEAT_INTERVAL = 10_000     // 30s心跳
 const MAX_NO_PONG_COUNT = 2           // 连续2轮无pong→重连
 // const RETRY_DELAYS = [1000, 2000, 4000, 8000, 10000] // 指数退避
 const RETRY_DELAYS = [1] // 指数退避
@@ -17,7 +17,7 @@ const MOCK_FALLBACK_DELAY = 5000      // 5s连不上则降级Mock
 
 const globalData = shallowRef<RealTimeDataMessage | null>(null)
 const globalConnectionState = ref<WsConnectionState>('disconnected')
-const globalsensorDeviceOnlineCount = ref(0)
+const globalIotDeviceOnlineCount = ref(0)
 const userDeviceOnlineCount = ref(0)
 const globalIsMock = ref(false)
 const globalLogs = ref<{ timestamp: number; level: string; message: string }[]>([])
@@ -57,6 +57,7 @@ function startHeartbeat() {
   noPongCount = 0
   heartbeatTimer = setInterval(() => {
     if (globalWs?.readyState === WebSocket.OPEN) {
+      // 心跳无效次数达到阈值，触发重连
       if (noPongCount >= MAX_NO_PONG_COUNT) {
         addLog('WARN', `连续${MAX_NO_PONG_COUNT}轮无心跳回应，触发重连`)
         stopHeartbeat()
@@ -108,13 +109,13 @@ function startMock() {
 
   const mockMsg = generateMockRealTimeData(USER_DEVICE_ID)
   globalData.value = mockMsg
-  globalsensorDeviceOnlineCount.value = mockMsg.data.iotDeviceOnlineCount
+  globalIotDeviceOnlineCount.value = mockMsg.data.iotDeviceOnlineCount
   updateWindowRealtime(mockMsg)
 
   mockTimer = setInterval(() => {
     const msg = generateMockRealTimeData(USER_DEVICE_ID)
     globalData.value = msg
-    globalsensorDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
+    globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
     updateWindowRealtime(msg)
     addLog('INFO', `设备 ${USER_DEVICE_ID} 上报传感器数据成功`)
   }, MOCK_INTERVAL)
@@ -159,12 +160,17 @@ function connect() {
         const msg: RealTimeDataMessage = JSON.parse(event.data)
         if (msg.type === 'REAL_TIME_DATA') {
           globalData.value = msg
-          globalsensorDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
+          globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
           updateWindowRealtime(msg)
           addLog('INFO', `设备 ${msg.device.deviceId} 上报传感器数据成功`)
+        }else if (msg.type === 'USER_DEVICE_ONLINE_COUNT') {
+          addLog('INFO', `用户设备 ${msg.device.deviceId} 数据更新成功`)
+          userDeviceOnlineCount.value = msg.data.userDeviceOnlineCount
         }
-      } catch {
-        addLog('ERROR', '接收到无法解析的消息数据')
+      } catch (e) {
+        const err = e as Error
+        addLog( 'ERROR', `消息解析失败：${err.message}`)
+        console.error('WS消息解析错误:', e)  // 控制台也打一份，方便看堆栈
       }
     }
 
@@ -182,7 +188,7 @@ function connect() {
         // const userDeviceId = USER_DEVICE_ID
         // 重置全局数据
         // globalData.value = null
-        // globalsensorDeviceOnlineCount.value = 0
+        // globalIotDeviceOnlineCount.value = 0
         // 弹出失联提示，3s渐隐消失
         // showDeviceLostToast(userDeviceId)
       }
@@ -275,7 +281,7 @@ export function useWebSocket() {
   return {
     data: globalData,
     connectionState: globalConnectionState,
-    iotDeviceOnlineCount: globalsensorDeviceOnlineCount,
+    iotDeviceOnlineCount: globalIotDeviceOnlineCount,
     userDeviceOnlineCount: userDeviceOnlineCount,
     isMock: globalIsMock,
     logs: globalLogs,
