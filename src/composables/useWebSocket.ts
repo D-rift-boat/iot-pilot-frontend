@@ -160,12 +160,15 @@ function connect() {
         const msg: RealTimeDataMessage = JSON.parse(event.data)
         if (msg.type === 'REAL_TIME_DATA') {
           globalData.value = msg
-          globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
+          // globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
           updateWindowRealtime(msg)
           addLog('INFO', `设备 ${msg.device.deviceId} 上报传感器数据成功`)
         }else if (msg.type === 'USER_DEVICE_ONLINE_COUNT') {
-          addLog('INFO', `用户设备 ${msg.device.deviceId} 数据更新成功`)
+          addLog('INFO', `用户设备 ${msg.device.deviceId} 数量数据更新成功`)
           userDeviceOnlineCount.value = msg.data.userDeviceOnlineCount
+        }else if (msg.type === 'IOT_DEVICE_ONLINE_COUNT') {
+          addLog('INFO', `iot设备 ${msg.device.deviceId} 数量数据更新成功`)
+          globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
         }
       } catch (e) {
         const err = e as Error
