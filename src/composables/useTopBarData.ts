@@ -18,7 +18,14 @@ const latencyTick = ref<number>(0)
 let latencyTimer: ReturnType<typeof setInterval> | null = null
 
 export function useTopBarData() {
-  const { data: wsData, connectionState, iotDeviceOnlineCount: wsIotCount, userDeviceOnlineCount: wsUserCount } = useWebSocket()
+  const {
+    data: wsData,
+    connectionState,
+    iotDeviceOnlineCount: wsIotCount,
+    userDeviceOnlineCount: wsUserCount,
+    hasReceivedIotCountUpdate,
+    hasReceivedUserCountUpdate,
+  } = useWebSocket()
 
   // ============ 当前展示值（HTTP → WS优先级，WS有数据则用WS） ============
   const tempAht = computed(() => {
@@ -52,14 +59,16 @@ export function useTopBarData() {
     return httpDeviceInfo.value?.deviceStatus === 1
   })
 
-  // 在线设备数：优先用 data 内的字段，其次用 WS 模块全局计数，最后用 HTTP 初始值
+  // 在线设备数：WS未收到独立通知 → 用HTTP初始快照；收到独立通知 → 用WS实时值
   const iotOnlineCount = computed(() => {
-    if (wsData.value) return wsData.value.data.iotDeviceOnlineCount ?? wsIotCount.value
+    if (hasReceivedIotCountUpdate.value) return wsIotCount.value
+    if (wsData.value?.data.iotDeviceOnlineCount !== undefined) return wsData.value.data.iotDeviceOnlineCount
     return httpIotOnlineCount.value
   })
 
   const userOnlineCount = computed(() => {
-    if (wsData.value) return wsData.value.data.userDeviceOnlineCount ?? wsUserCount.value
+    if (hasReceivedUserCountUpdate.value) return wsUserCount.value
+    if (wsData.value?.data.userDeviceOnlineCount !== undefined) return wsData.value.data.userDeviceOnlineCount
     return httpUserOnlineCount.value
   })
 

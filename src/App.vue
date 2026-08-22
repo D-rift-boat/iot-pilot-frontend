@@ -316,7 +316,7 @@ function handleUserCommand(cmd: string) {
 }
 
 .realtime-value.latency {
-  color: #A3B18A;
+  color: #f99494;
 }
 
 .status-dot {

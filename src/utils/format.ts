@@ -51,10 +51,14 @@ export function formatFullTime(ts: number): string {
   return d.toLocaleString('zh-CN', { hour12: false })
 }
 
-/** 传感器值安全展示：缺失/空字符串/undefined/null → '--' */
+/** 传感器值安全展示：缺失/空字符串/undefined/null → '--'；数值最多保留2位小数 */
 export function formatSensorValue(val: string | number | undefined | null): string {
   if (val === undefined || val === null || val === '') return '--'
-  return String(val)
+  const n = Number(val)
+  if (isNaN(n)) return String(val)
+  // 保留最多2位小数（去除尾部多余的0）
+  const fixed = n.toFixed(2)
+  return parseFloat(fixed).toString()
 }
 
 /** 时间戳格式化为 yyyy-MM-dd HH:mm:ss */
@@ -74,7 +78,7 @@ export function formatDataLatency(dataTimestamp: number | string): string {
   if (isNaN(delay) || delay < 0) return '--'
 
   if (delay < 1000) {
-    return `${delay} ms`
+    return `${delay}ms`
   }
   if (delay < 60_000) {
     const s = Math.floor(delay / 1000)

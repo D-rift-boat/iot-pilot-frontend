@@ -198,17 +198,11 @@ const altitudeDisplay = computed(() => altitude.value === '--' ? '--' : altitude
   margin-bottom: 24px;
 }
 
-/* 卡片：同一列内垂直排列的卡片之间有足够的间距 */
-:deep(.el-col) {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
+/* 卡片：每张底部都有独立间距，保证同一列两张卡片上下间距明显 */
 .mp-card {
   min-height: 160px;
   box-sizing: border-box;
-  margin-bottom: 0;
+  margin-bottom: 20px;
 }
 
 .card-label {
