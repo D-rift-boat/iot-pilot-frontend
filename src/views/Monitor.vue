@@ -58,15 +58,29 @@ async function loadHistoryData(range: string = '1h') {
   }
 }
 
+/** 安全地把字符串传感器值转为 number，无效值返回 NaN */
+function safeNum(val: string | number | undefined | null): number {
+  if (val === undefined || val === null || val === '') return NaN
+  const n = Number(val)
+  return isNaN(n) ? NaN : n
+}
+
 /** WS实时数据追加到图表 */
 function pushData(msg: NonNullable<typeof data.value>) {
-  const time = new Date(msg.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
+  const time = new Date(Number(msg.timestamp)).toLocaleTimeString('zh-CN', { hour12: false })
+  const tAht = safeNum(msg.data.tempAht)
+  const tBmp = safeNum(msg.data.tempBmp)
+  const h = safeNum(msg.data.humidity)
+  const p = safeNum(msg.data.pressureHpa)
+
+  // 只有在至少有一个有效数值时才推入（避免全NaN污染图表）
+  if (isNaN(tAht) && isNaN(tBmp) && isNaN(h) && isNaN(p)) return
 
   timeLabels.value.push(time)
-  aht20Temps.value.push(msg.data.tempAht)
-  bmp280Temps.value.push(msg.device.tempBmp)
-  humidities.value.push(msg.data.humidity)
-  pressures.value.push(msg.data.pressureHpa)
+  aht20Temps.value.push(tAht)
+  bmp280Temps.value.push(tBmp)
+  humidities.value.push(h)
+  pressures.value.push(p)
 
   // 保留最近MAX_POINTS个点
   while (timeLabels.value.length > MAX_POINTS) {

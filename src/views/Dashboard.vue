@@ -1,24 +1,39 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useWebSocket } from '../composables/useWebSocket'
+import { useTopBarData } from '../composables/useTopBarData'
 import { getComfortLevel, getTrend } from '../utils/format'
 
-const { data, isMock, iotDeviceOnlineCount } = useWebSocket()
+const {
+  tempAht, tempBmp, humidity, pressure, altitude,
+  deviceOnline, iotOnlineCount, userOnlineCount,
+  updateTimeStr, latencyStr,
+} = useTopBarData()
 
 const deviceId = 'esp32-S3-001'
-const isOnline = computed(() => (data.value?.device?.deviceStatus ?? 0) === 1)
+const isOnline = computed(() => deviceOnline.value)
 
-const tempAht = computed(() => data.value?.data?.tempAht ?? 0)
-const tempBmp = computed(() => data.value?.device?.tempBmp ?? 0)
+/** 安全解析为数字，'--' 或无效值返回 NaN */
+function toNum(val: string): number {
+  if (val === '--' || val === '') return NaN
+  return Number(val)
+}
+
+const tempAhtNum = computed(() => toNum(tempAht.value))
+const tempBmpNum = computed(() => toNum(tempBmp.value))
 
 const avgTemp = computed(() => {
-  if (!data.value) return '--'
-  return ((tempAht.value + tempBmp.value) / 2).toFixed(1)
+  const a = tempAhtNum.value
+  const b = tempBmpNum.value
+  if (isNaN(a) && isNaN(b)) return '--'
+  if (isNaN(a)) return b.toFixed(1)
+  if (isNaN(b)) return a.toFixed(1)
+  return ((a + b) / 2).toFixed(1)
 })
 
 const tempTrend = computed(() => {
-  if (!data.value) return 'stable'
-  return getTrend([tempAht.value, tempBmp.value])
+  const arr = [tempAhtNum.value, tempBmpNum.value].filter(v => !isNaN(v))
+  if (arr.length < 2) return 'stable'
+  return getTrend(arr)
 })
 
 const trendIcon = computed(() => {
@@ -33,17 +48,20 @@ const trendColor = computed(() => {
   return 'var(--mp-success)'
 })
 
-const humidity = computed(() => data.value?.data?.humidity ?? 0)
-const comfortLevel = computed(() => getComfortLevel(humidity.value))
-const pressure = computed(() => data.value?.data?.pressureHpa ?? 0)
-const altitude = computed(() => data.value?.data?.altitude ?? 0)
+const humidityNum = computed(() => toNum(humidity.value))
+const comfortLevel = computed(() => {
+  if (isNaN(humidityNum.value)) return '--'
+  return getComfortLevel(humidityNum.value)
+})
+
+const pressureDisplay = computed(() => pressure.value === '--' ? '--' : pressure.value)
+const altitudeDisplay = computed(() => altitude.value === '--' ? '--' : altitude.value)
 </script>
 
 <template>
   <div class="page-container">
     <div class="dashboard-header">
       <h2 class="page-title">首页概览</h2>
-      <el-tag v-if="isMock" type="warning" effect="plain" round>Mock 模式</el-tag>
     </div>
 
     <el-row :gutter="20" class="card-row">
@@ -66,14 +84,15 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
           <div class="data-value">
             <span class="big-num">{{ avgTemp }}</span>
             <span class="unit">°C</span>
-            <el-icon :size="18" :style="{ color: trendColor, marginLeft: '8px' }">
+            <el-icon v-if="avgTemp !== '--'" :size="18" :style="{ color: trendColor, marginLeft: '8px' }">
               <component :is="trendIcon" />
             </el-icon>
           </div>
           <div class="data-sub">
-            AHT20: {{ tempAht.toFixed(1) }}°C |
-            BMP280: {{ tempBmp.toFixed(1) }}°C
+            AHT20: {{ tempAht }}°C |
+            BMP280: {{ tempBmp }}°C
           </div>
+          <div class="data-sub update-time">更新：{{ updateTimeStr }}</div>
         </div>
       </el-col>
 
@@ -81,12 +100,13 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
         <div class="mp-card data-card">
           <div class="card-label">实时湿度</div>
           <div class="data-value">
-            <span class="big-num">{{ humidity.toFixed(1) }}</span>
+            <span class="big-num">{{ humidity }}</span>
             <span class="unit">%</span>
           </div>
           <div class="data-sub">
             舒适度：
             <el-tag
+              v-if="comfortLevel !== '--'"
               :type="comfortLevel === '舒适' ? 'success' : 'warning'"
               effect="plain"
               round
@@ -94,7 +114,9 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
             >
               {{ comfortLevel }}
             </el-tag>
+            <span v-else>--</span>
           </div>
+          <div class="data-sub update-time">更新：{{ updateTimeStr }}</div>
         </div>
       </el-col>
 
@@ -102,10 +124,11 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
         <div class="mp-card data-card">
           <div class="card-label">环境气压 / 海拔</div>
           <div class="data-value">
-            <span class="big-num">{{ pressure.toFixed(1) }}</span>
+            <span class="big-num">{{ pressureDisplay }}</span>
             <span class="unit">hPa</span>
           </div>
-          <div class="data-sub">海拔约 {{ altitude.toFixed(0) }} m</div>
+          <div class="data-sub">海拔约 {{ altitudeDisplay }} m</div>
+          <div class="data-sub update-time">更新：{{ updateTimeStr }}</div>
         </div>
       </el-col>
 
@@ -113,14 +136,13 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
         <div class="mp-card data-card">
           <div class="card-label">在线设备数</div>
           <div class="data-value">
-            <span class="big-num">{{ iotDeviceOnlineCount }}</span>
+            <span class="big-num">{{ iotOnlineCount }}</span>
             <span class="unit">台</span>
           </div>
           <div class="data-sub">
-            <el-tag :type="iotDeviceOnlineCount > 0 ? 'success' : 'danger'" effect="plain" round size="small">
-              {{ iotDeviceOnlineCount > 0 ? '正常运行' : '无设备在线' }}
-            </el-tag>
+            IoT设备 {{ iotOnlineCount }} 台 | 用户设备 {{ userOnlineCount }} 台
           </div>
+          <div class="data-sub update-time">延迟：{{ latencyStr }}</div>
         </div>
       </el-col>
     </el-row>
@@ -154,11 +176,16 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
 </template>
 
 <style scoped>
+.page-container {
+  padding: 24px;
+  box-sizing: border-box;
+}
+
 .dashboard-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .page-title {
@@ -168,7 +195,20 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
 }
 
 .card-row {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+/* 卡片：同一列内垂直排列的卡片之间有足够的间距 */
+:deep(.el-col) {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.mp-card {
+  min-height: 160px;
+  box-sizing: border-box;
+  margin-bottom: 0;
 }
 
 .card-label {
@@ -230,6 +270,12 @@ const altitude = computed(() => data.value?.data?.altitude ?? 0)
   font-size: 12px;
   color: var(--mp-text-secondary);
   margin-top: 10px;
+}
+
+.data-sub.update-time {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 6px;
 }
 
 .section-title {

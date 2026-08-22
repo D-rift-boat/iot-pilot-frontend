@@ -50,3 +50,55 @@ export function formatFullTime(ts: number): string {
   const d = new Date(ts)
   return d.toLocaleString('zh-CN', { hour12: false })
 }
+
+/** 传感器值安全展示：缺失/空字符串/undefined/null → '--' */
+export function formatSensorValue(val: string | number | undefined | null): string {
+  if (val === undefined || val === null || val === '') return '--'
+  return String(val)
+}
+
+/** 时间戳格式化为 yyyy-MM-dd HH:mm:ss */
+export function formatDateTime(ts: number | string): string {
+  const d = new Date(typeof ts === 'string' ? Number(ts) : ts)
+  if (isNaN(d.getTime())) return '--'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** 数据延迟格式化：当前时间 - 数据时间戳 */
+export function formatDataLatency(dataTimestamp: number | string): string {
+  const ts = typeof dataTimestamp === 'string' ? Number(dataTimestamp) : dataTimestamp
+  const delay = Date.now() - ts
+  if (isNaN(delay) || delay < 0) return '--'
+
+  if (delay < 1000) {
+    return `${delay} ms`
+  }
+  if (delay < 60_000) {
+    const s = Math.floor(delay / 1000)
+    const ms = delay % 1000
+    return `${s}s:${pad(ms)}ms`
+  }
+  if (delay < 3_600_000) {
+    const min = Math.floor(delay / 60_000)
+    const s = Math.floor((delay % 60_000) / 1000)
+    const ms = delay % 1000
+    return `${min}min:${pad(s)}s:${pad(ms)}ms`
+  }
+  if (delay < 86_400_000) {
+    const h = Math.floor(delay / 3_600_000)
+    const min = Math.floor((delay % 3_600_000) / 60_000)
+    const s = Math.floor((delay % 60_000) / 1000)
+    const ms = delay % 1000
+    return `${h}h:${pad(min)}min:${pad(s)}s:${pad(ms)}ms`
+  }
+  // ≥24h
+  const d = Math.floor(delay / 86_400_000)
+  const h = Math.floor((delay % 86_400_000) / 3_600_000)
+  const min = Math.floor((delay % 3_600_000) / 60_000)
+  const s = Math.floor((delay % 60_000) / 1000)
+  const ms = delay % 1000
+  return `${d}d:${pad(h)}h:${pad(min)}min:${pad(s)}s:${pad(ms)}ms`
+}

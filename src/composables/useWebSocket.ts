@@ -1,12 +1,12 @@
 import { ref, shallowRef } from 'vue'
-import type { RealTimeDataMessage, HomePilotRealtime, WsConnectionState } from '../api/types/device'
+import type { WsRealtimeMessage, HomePilotRealtime, WsConnectionState } from '../api/types/device'
 import { generateMockRealTimeData } from '../utils/mock'
 
 // ============ 常量配置 ============
 const WS_URL = 'ws://localhost:8080/ws'
 const USER_DEVICE_ID = 'laptop'
 const USER_ID = 'admin'
-const HEARTBEAT_INTERVAL = 10_000     // 30s心跳
+const HEARTBEAT_INTERVAL = 10_000     // 10s心跳
 const MAX_NO_PONG_COUNT = 2           // 连续2轮无pong→重连
 // const RETRY_DELAYS = [1000, 2000, 4000, 8000, 10000] // 指数退避
 const RETRY_DELAYS = [1] // 指数退避
@@ -15,7 +15,7 @@ const MOCK_FALLBACK_DELAY = 5000      // 5s连不上则降级Mock
 // ============ 全局单例状态（模块级变量，跨组件共享） ============
 
 
-const globalData = shallowRef<RealTimeDataMessage | null>(null)
+const globalData = shallowRef<WsRealtimeMessage | null>(null)
 const globalConnectionState = ref<WsConnectionState>('disconnected')
 const globalIotDeviceOnlineCount = ref(0)
 const userDeviceOnlineCount = ref(0)
@@ -23,7 +23,7 @@ const globalIsMock = ref(false)
 const globalLogs = ref<{ timestamp: number; level: string; message: string }[]>([])
 let globalWs: WebSocket | null = null
 
-let isHeartbeatTimeoutClose = false //新增
+let isHeartbeatTimeoutClose = false
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 let mockTimer: ReturnType<typeof setInterval> | null = null
 let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -32,14 +32,19 @@ let retryCount = 0
 let noPongCount = 0
 let isManualClose = false
 
+/** 统一获取 msgType（兼容 msgType 和 type 两个字段） */
+function getMsgType(msg: any): string {
+  return msg?.msgType || msg?.type || ''
+}
+
 // 跨页面共享：挂载到window
-function updateWindowRealtime(msg: RealTimeDataMessage) {
+function updateWindowRealtime(msg: WsRealtimeMessage) {
   const realtime: HomePilotRealtime = {
-    tempAht: msg.data.tempAht,
-    humidity: msg.data.humidity,
-    pressureHpa: msg.data.pressureHpa,
-    altitude: msg.data.altitude,
-    iotDeviceOnlineCount: msg.data.iotDeviceOnlineCount,
+    tempAht: msg.data.tempAht ?? '',
+    humidity: msg.data.humidity ?? '',
+    pressureHpa: msg.data.pressureHpa ?? '',
+    altitude: msg.data.altitude ?? '',
+    iotDeviceOnlineCount: msg.data.iotDeviceOnlineCount ?? 0,
   }
   ;(window as any).homePilotRealtime = realtime
 }
@@ -57,15 +62,14 @@ function startHeartbeat() {
   noPongCount = 0
   heartbeatTimer = setInterval(() => {
     if (globalWs?.readyState === WebSocket.OPEN) {
-      // 心跳无效次数达到阈值，触发重连
       if (noPongCount >= MAX_NO_PONG_COUNT) {
         addLog('WARN', `连续${MAX_NO_PONG_COUNT}轮无心跳回应，触发重连`)
         stopHeartbeat()
-        isHeartbeatTimeoutClose = true //标记是心跳超时关闭
+        isHeartbeatTimeoutClose = true
         globalWs?.close()
         return
       }
-      globalWs.send(JSON.stringify({"type":"ping"}))
+      globalWs.send(JSON.stringify({"msgType":"PING"}))
       noPongCount++
     }
   }, HEARTBEAT_INTERVAL)
@@ -109,15 +113,17 @@ function startMock() {
 
   const mockMsg = generateMockRealTimeData(USER_DEVICE_ID)
   globalData.value = mockMsg
-  globalIotDeviceOnlineCount.value = mockMsg.data.iotDeviceOnlineCount
+  globalIotDeviceOnlineCount.value = mockMsg.data.iotDeviceOnlineCount ?? 0
+  userDeviceOnlineCount.value = mockMsg.data.userDeviceOnlineCount ?? 0
   updateWindowRealtime(mockMsg)
 
   mockTimer = setInterval(() => {
     const msg = generateMockRealTimeData(USER_DEVICE_ID)
     globalData.value = msg
-    globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
+    globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount ?? 0
+    userDeviceOnlineCount.value = msg.data.userDeviceOnlineCount ?? 0
     updateWindowRealtime(msg)
-    addLog('INFO', `设备 ${USER_DEVICE_ID} 上报传感器数据成功`)
+    addLog('INFO', `设备 ${msg.device.deviceId} 上报传感器数据成功`)
   }, MOCK_INTERVAL)
 }
 
@@ -150,30 +156,45 @@ function connect() {
     }
 
     globalWs.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      // 心跳pong回应
-      if (msg.type === 'pong') {
-        noPongCount = 0
-        return
-      }
       try {
-        const msg: RealTimeDataMessage = JSON.parse(event.data)
-        if (msg.type === 'REAL_TIME_DATA') {
+        const msg: WsRealtimeMessage = JSON.parse(event.data)
+        const msgType = getMsgType(msg)
+        // 心跳pong回应
+        if (msgType === 'PONG' || msgType === 'pong') {
+          noPongCount = 0
+          return
+        }
+        if (msgType === 'REAL_TIME_DATA') {
           globalData.value = msg
-          // globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
+          // 兼容：在线设备数可能在 data 内或顶层
+          const iotCount = msg.data.iotDeviceOnlineCount ?? (msg as any).iotDeviceOnlineCount
+          const userCount = msg.data.userDeviceOnlineCount ?? (msg as any).userDeviceOnlineCount
+          if (iotCount !== undefined) {
+            globalIotDeviceOnlineCount.value = iotCount
+          }
+          if (userCount !== undefined) {
+            userDeviceOnlineCount.value = userCount
+          }
           updateWindowRealtime(msg)
           addLog('INFO', `设备 ${msg.device.deviceId} 上报传感器数据成功`)
-        }else if (msg.type === 'USER_DEVICE_ONLINE_COUNT') {
-          addLog('INFO', `用户设备 ${msg.device.deviceId} 数量数据更新成功`)
-          userDeviceOnlineCount.value = msg.data.userDeviceOnlineCount
-        }else if (msg.type === 'IOT_DEVICE_ONLINE_COUNT') {
-          addLog('INFO', `iot设备 ${msg.device.deviceId} 数量数据更新成功`)
-          globalIotDeviceOnlineCount.value = msg.data.iotDeviceOnlineCount
+        } else if (msgType === 'DEVICE_ONLINE_OFFLINE') {
+          globalData.value = msg
+          updateWindowRealtime(msg)
+          const statusLabel = msg.device.deviceStatus === 1 ? '上线' : '下线'
+          addLog('INFO', `设备 ${msg.device.deviceId} ${statusLabel}`)
+        } else if (msgType === 'IOT_DEVICE_ONLINE_COUNT') {
+          const count = msg.data.iotDeviceOnlineCount ?? (msg as any).iotDeviceOnlineCount
+          addLog('INFO', `IoT设备数量更新: ${count}`)
+          globalIotDeviceOnlineCount.value = count ?? 0
+        } else if (msgType === 'USER_DEVICE_ONLINE_COUNT') {
+          const count = msg.data.userDeviceOnlineCount ?? (msg as any).userDeviceOnlineCount
+          addLog('INFO', `用户设备数量更新: ${count}`)
+          userDeviceOnlineCount.value = count ?? 0
         }
       } catch (e) {
         const err = e as Error
-        addLog( 'ERROR', `消息解析失败：${err.message}`)
-        console.error('WS消息解析错误:', e)  // 控制台也打一份，方便看堆栈
+        addLog('ERROR', `消息解析失败：${err.message}`)
+        console.error('WS消息解析错误:', e)
       }
     }
 
@@ -186,14 +207,8 @@ function connect() {
       stopHeartbeat()
       addLog('WARN', 'WebSocket 连接已断开')
 
-      // 取出上一次的设备id，断开弹窗使用
       if(isHeartbeatTimeoutClose) {
-        // const userDeviceId = USER_DEVICE_ID
-        // 重置全局数据
-        // globalData.value = null
-        // globalIotDeviceOnlineCount.value = 0
-        // 弹出失联提示，3s渐隐消失
-        // showDeviceLostToast(userDeviceId)
+        // 心跳超时关闭，预留处理
       }
 
       if (!isManualClose) {
@@ -213,10 +228,8 @@ function connect() {
 function showDeviceLostToast(userDeviceId : string) {
   const toastText = userDeviceId ? `设备 ${userDeviceId} 已失联下线` : `设备已失联`
 
-  // 创建dom
   const toastEl = document.createElement('div')
   toastEl.innerText = toastText
-  // 基础样式 + 渐隐动画
   toastEl.style.cssText = `
     position: fixed;
     top:24px;
@@ -232,12 +245,10 @@ function showDeviceLostToast(userDeviceId : string) {
   `
   document.body.appendChild(toastEl)
 
-  // 触发渐隐
   setTimeout(() => {
     toastEl.style.opacity = '0'
   }, 0)
 
-  // 动画结束移除dom，transition3s，多等100ms
   setTimeout(() => {
     toastEl.remove()
   }, 10100)

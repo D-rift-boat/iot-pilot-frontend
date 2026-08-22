@@ -5,65 +5,61 @@ export interface ApiResponse<T> {
   code: number
   message: string
   data: T
-  timestamp: number
+  timestamp?: number
 }
 
-// ---------- 设备上报数据（UP_DATA） ----------
+// ---------- 环境数据（HTTP data.data / WS data.data 共用，字符串格式，传感器故障时可能缺失或空字符串） ----------
 
-/** 传感器状态 */
-export interface SensorStatus {
-  aht20: number   // 1=正常 3=离线
-  bmp280: number
-}
-
-/** 环境数据 */
 export interface EnvData {
-  tempAht: number       // AHT20温度
-  tempBmp: number       // BMP280温度
-  humidity: number      // 湿度 %
-  pressureHpa: number   // 气压 hPa
-  altitude: number      // 海拔 m
+  tempAht?: string
+  tempBmp?: string
+  humidity?: string
+  pressureHpa?: string
+  altitude?: string
+  iotDeviceOnlineCount?: number
+  userDeviceOnlineCount?: number
 }
 
-/** 设备上报payload */
-export interface DeviceUploadPayload {
-  deviceStatus: number
-  sensorStatus: SensorStatus
-  envData: EnvData
-  extend: Record<string, unknown>
+// ---------- 设备信息（HTTP device / WS device 共用） ----------
+
+export interface DeviceInfo {
+  deviceId: string
+  deviceStatus: number       // 1=在线 3=离线
+  aht20Status: number        // 1=正常 其他=异常
+  bmp280Status: number       // 1=正常 其他=异常
 }
 
-// ---------- WebSocket推送实时数据（REAL_TIME_DATA） ----------
+// ---------- 通用实时数据载荷（HTTP & WS 嵌套结构 共用） ----------
 
-/** WS推送的实时数据（后端→前端） */
-export interface RealTimeDataMessage {
-  type: 'REAL_TIME_DATA'
-  data: {
-    tempAht: number
-    humidity: number
-    pressureHpa: number
-    altitude: number
-    iotDeviceOnlineCount: number
-    userDeviceOnlineCount: number
-  }
-  device: {
-    deviceId: string
-    deviceStatus: number
-    aht20Status: number
-    bmp280Status: number
-    tempBmp: number
-  }
-  timestamp: number
+/**
+ * 后端实际返回结构（HTTP响应data字段 / WS推送消息体 共用）
+ * { type, data: EnvData, device: DeviceInfo, timestamp }
+ */
+export interface RealtimePayload {
+  type: string               // "REAL_TIME_DATA"
+  data: EnvData
+  device: DeviceInfo
+  timestamp: number | string
 }
+
+// ---------- WebSocket推送消息类型 ----------
+
+/** WS推送消息（RealtimePayload 基础上附加 msgType 等WS特有字段） */
+export interface WsRealtimeMessage extends RealtimePayload {
+  msgType?: string           // 兼容：部分WS消息可能放在顶层 msgType（等价于 type）
+}
+
+/** @deprecated 兼容旧引用，等同于 WsRealtimeMessage */
+export type RealTimeDataMessage = WsRealtimeMessage
 
 // ---------- 跨页面共享数据 ----------
 
 /** window.homePilotRealtime 结构 */
 export interface HomePilotRealtime {
-  tempAht: number
-  humidity: number
-  pressureHpa: number
-  altitude: number
+  tempAht: string
+  humidity: string
+  pressureHpa: string
+  altitude: string
   iotDeviceOnlineCount: number
 }
 
@@ -121,6 +117,19 @@ export interface LogEntry {
   level: 'INFO' | 'WARN' | 'ERROR'
   message: string
 }
+
+// ---------- Dashboard顶部数据HTTP查询 ----------
+
+/** 通用HTTP请求入参 */
+export interface DashboardRequestParams {
+  requestId: string
+  timestamp: number
+  sign: string
+  userId: string
+}
+
+/** getTopDashboardData 返回的 data 结构（直接是对象，不是JSON字符串） */
+export type DashboardDataResponse = RealtimePayload
 
 // ---------- 全局WS连接状态 ----------
 
