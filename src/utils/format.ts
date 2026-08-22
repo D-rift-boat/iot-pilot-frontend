@@ -71,38 +71,34 @@ export function formatDateTime(ts: number | string): string {
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
-/** 数据延迟格式化：当前时间 - 数据时间戳 */
-export function formatDataLatency(dataTimestamp: number | string): string {
+/** 
+ * 数据延迟格式化：当前时间 - 数据时间戳
+ * @param dataTimestamp 数据时间戳（毫秒级）
+ * @param showUnit 是否显示单位（默认false）
+ * @returns 格式化后的延迟字符串
+ */
+export function formatDataLatency(dataTimestamp: number | string, showUnit = false): string {
   const ts = typeof dataTimestamp === 'string' ? Number(dataTimestamp) : dataTimestamp
   const delay = Date.now() - ts
+  // 100天 毫秒：100 * 86400000
+  const MAX_ALLOW_MS = 100 * 86_400_000
   if (isNaN(delay) || delay < 0) return '--'
+  if (delay > MAX_ALLOW_MS) {
+    return '100天以上'
+  }
 
-  if (delay < 1000) {
-    return `${delay}ms`
-  }
-  if (delay < 60_000) {
-    const s = Math.floor(delay / 1000)
-    const ms = delay % 1000
-    return `${s}s:${pad(ms)}ms`
-  }
-  if (delay < 3_600_000) {
-    const min = Math.floor(delay / 60_000)
-    const s = Math.floor((delay % 60_000) / 1000)
-    const ms = delay % 1000
-    return `${min}min:${pad(s)}s:${pad(ms)}ms`
-  }
-  if (delay < 86_400_000) {
-    const h = Math.floor(delay / 3_600_000)
-    const min = Math.floor((delay % 3_600_000) / 60_000)
-    const s = Math.floor((delay % 60_000) / 1000)
-    const ms = delay % 1000
-    return `${h}h:${pad(min)}min:${pad(s)}s:${pad(ms)}ms`
-  }
-  // ≥24h
+  const pad2 = (v: number) => v.toString().padStart(2, '0')
+  const pad3 = (v: number) => v.toString().padStart(3, '0')
+
   const d = Math.floor(delay / 86_400_000)
   const h = Math.floor((delay % 86_400_000) / 3_600_000)
   const min = Math.floor((delay % 3_600_000) / 60_000)
   const s = Math.floor((delay % 60_000) / 1000)
   const ms = delay % 1000
-  return `${d}d:${pad(h)}h:${pad(min)}min:${pad(s)}s:${pad(ms)}ms`
+
+  if (showUnit) {
+    return `${pad2(d)}d:${pad2(h)}h:${pad2(min)}min:${pad2(s)}s:${pad3(ms)}ms`
+  } else {
+    return `${pad2(d)}:${pad2(h)}:${pad2(min)}:${pad2(s)}:${pad3(ms)}`
+  }
 }
