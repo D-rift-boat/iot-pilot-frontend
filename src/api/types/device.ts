@@ -101,9 +101,9 @@ export interface DeviceCommand {
 // ---------- 历史数据（InfluxDB查询返回） ----------
 
 export interface HistoryDataPoint {
-  timestamp: number
-  tempAht: number
-  tempBmp: number
+  reportTime: number
+  temperatureAht: number
+  temperatureBmp: number
   humidity: number
   pressureHpa: number
   altitude: number

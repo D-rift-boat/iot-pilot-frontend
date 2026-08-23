@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { useWebSocket } from '../composables/useWebSocket'
 import { getDeviceHistory } from '../api/device'
+import dayjs from 'dayjs'
 
 const { data, isMock } = useWebSocket()
 
@@ -38,10 +39,10 @@ async function loadHistoryData(range: string = '1h') {
 
     if (historyPoints && historyPoints.length > 0) {
       timeLabels.value = historyPoints.map(p =>
-        new Date(p.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
+        new Date(p.reportTime).toLocaleTimeString('zh-CN', { hour12: false })
       )
-      aht20Temps.value = historyPoints.map(p => p.tempAht)
-      bmp280Temps.value = historyPoints.map(p => p.tempBmp)
+      aht20Temps.value = historyPoints.map(p => p.temperatureAht)
+      bmp280Temps.value = historyPoints.map(p => p.temperatureBmp)
       humidities.value = historyPoints.map(p => p.humidity)
       pressures.value = historyPoints.map(p => p.pressureHpa)
     } else {
@@ -67,7 +68,10 @@ function safeNum(val: string | number | undefined | null): number {
 
 /** WS实时数据追加到图表 */
 function pushData(msg: NonNullable<typeof data.value>) {
-  const time = new Date(Number(msg.timestamp)).toLocaleTimeString('zh-CN', { hour12: false })
+// 格式化时间（毫秒时间戳 → HH:mm:ss）
+//   const time = dayjs(Number(msg.timestamp)).format('HH:mm:ss')
+  // 完整日期时间
+  const time = dayjs(Number(msg.timestamp)).format('YYYY-MM-DD HH:mm:ss')
   const tAht = safeNum(msg.data.tempAht)
   const tBmp = safeNum(msg.data.tempBmp)
   const h = safeNum(msg.data.humidity)
