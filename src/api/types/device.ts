@@ -118,9 +118,35 @@ export interface LogEntry {
   message: string
 }
 
-// ---------- Dashboard顶部数据HTTP查询 ----------
+// ---------- 通用请求入参 ----------
 
-/** 通用HTTP请求入参 */
+/** 获取设备最新状态请求 */
+export interface DeviceLatestRequest {
+  deviceId: string
+}
+
+/** 获取历史数据请求 */
+export interface DeviceHistoryRequest {
+  deviceId: string
+  startTime: number
+  endTime: number
+}
+
+/** 查询日志列表请求 */
+export interface LogListRequest {
+  level?: string
+  page?: number
+  size?: number
+}
+
+/** 下发设备指令请求 */
+export interface DeviceCommandRequest {
+  deviceId: string
+  cmdCode: 'device_restart' | 'sensor_calibrate' | 'light_switch'
+  params: Record<string, unknown>
+}
+
+/** 通用HTTP请求入参（Dashboard） */
 export interface DashboardRequestParams {
   requestId: string
   timestamp: number

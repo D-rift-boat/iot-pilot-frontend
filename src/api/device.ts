@@ -4,42 +4,44 @@ import type {
   DeviceLatestData,
   DeviceListItem,
   HistoryDataPoint,
-  DeviceCommand,
   LogEntry,
   DashboardRequestParams,
   DashboardDataResponse,
+  DeviceCommandRequest,
 } from './types/device'
 
 /** 获取设备最新状态（Redis快照） */
 export function getDeviceLatest(deviceId: string) {
-  return request.get<ApiResponse<DeviceLatestData>>(`/api/v1/device/${deviceId}/status`)
+  return request.post<ApiResponse<DeviceLatestData>>('/api/v1/device/status', { deviceId })
 }
 
 /** 获取设备列表 */
 export function getDeviceList() {
-  return request.get<ApiResponse<DeviceListItem[]>>('/api/v1/device/list')
+  return request.post<ApiResponse<DeviceListItem[]>>('/api/v1/device/list')
 }
 
 /** 获取历史数据（InfluxDB查询） */
 export function getDeviceHistory(deviceId: string, startTime: number, endTime: number) {
-  return request.get<ApiResponse<HistoryDataPoint[]>>(`/api/v1/device/${deviceId}/history`, {
-    params: { startTime, endTime },
+  return request.post<ApiResponse<HistoryDataPoint[]>>('/api/v1/device/history', {
+    deviceId, startTime, endTime,
   })
 }
 
 /** 下发设备指令 */
-export function sendDeviceCommand(deviceId: string, cmd: DeviceCommand) {
-  return request.post<ApiResponse<null>>(`/api/v1/device/${deviceId}/command`, cmd)
+export function sendDeviceCommand(deviceId: string, cmd: Pick<DeviceCommandRequest, 'cmdCode' | 'params'>) {
+  return request.post<ApiResponse<null>>('/api/v1/device/command', {
+    deviceId, cmdCode: cmd.cmdCode, params: cmd.params,
+  })
 }
 
 /** 获取在线设备数 */
 export function getOnlineCount() {
-  return request.get<ApiResponse<number>>('/api/v1/device/iotDeviceOnlineCount')
+  return request.post<ApiResponse<number>>('/api/v1/device/iotDeviceOnlineCount')
 }
 
 /** 查询日志列表 */
 export function getLogList(params: { level?: string; page?: number; size?: number }) {
-  return request.get<ApiResponse<LogEntry[]>>('/api/v1/log/list', { params })
+  return request.post<ApiResponse<LogEntry[]>>('/api/v1/log/list', params)
 }
 
 /** 生成通用请求入参（requestId + timestamp + sign） */
