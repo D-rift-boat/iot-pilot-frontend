@@ -44,6 +44,7 @@ function breakLargeGaps(data: DataPoint[], maxGapMs: number = MAX_GAP_MS): DataP
 type ViewMode = 'realtime' | 'custom'
 const timeRange = ref('1h')
 const customTimeRange = ref<[number, number] | null>(null)
+const customRangeBound = ref<{ start: number; end: number } | null>(null)
 const viewMode = ref<ViewMode>('realtime')
 const currentRangeMs = ref(3_600_000)
 
@@ -135,12 +136,14 @@ function loadByRange(range: string) {
 function loadByCustom(startTime: number, endTime: number) {
   viewMode.value = 'custom'
   currentRangeMs.value = endTime - startTime
+  customRangeBound.value = { start: startTime, end: endTime }
   fetchHistory(startTime, endTime)
 }
 
 /** 快捷范围切换 */
 function handleRangeChange(val: string) {
   customTimeRange.value = null
+  customRangeBound.value = null
   loadByRange(val)
 }
 
@@ -258,6 +261,7 @@ function initTempHumidChart() {
         type: 'line',
         smooth: true,
         showSymbol: false,
+        connectNulls: false,
         data: aht20TempData.value,
         lineStyle: { color: '#7BA39E', width: 2 },
         itemStyle: { color: '#7BA39E' },
@@ -273,6 +277,7 @@ function initTempHumidChart() {
         type: 'line',
         smooth: true,
         showSymbol: false,
+        connectNulls: false,
         data: bmp280TempData.value,
         lineStyle: { color: '#8E9AAF', width: 2 },
         itemStyle: { color: '#8E9AAF' },
@@ -288,6 +293,7 @@ function initTempHumidChart() {
         type: 'line',
         smooth: true,
         showSymbol: false,
+        connectNulls: false,
         yAxisIndex: 1,
         data: humidityData.value,
         lineStyle: { color: '#A3B18A', width: 2 },
@@ -335,6 +341,7 @@ function initPressureChart() {
         type: 'line',
         smooth: true,
         showSymbol: false,
+        connectNulls: false,
         data: pressureData.value,
         lineStyle: { color: '#D4A373', width: 2 },
         itemStyle: { color: '#D4A373' },
@@ -358,6 +365,9 @@ function updateCharts() {
     const now = Date.now()
     max = now
     min = now - currentRangeMs.value
+  } else if (viewMode.value === 'custom' && customRangeBound.value) {
+    min = customRangeBound.value.start
+    max = customRangeBound.value.end
   }
 
   if (tempHumidChart) {
