@@ -77,10 +77,8 @@ function fix2(val: number | null): number | null {
 
 /** 根据时间范围选择 x 轴标签格式 */
 function formatAxisLabel(timestamp: number): string {
-  if (currentRangeMs.value <= 3_600_000) {
-    return dayjs(timestamp).format('HH:mm:ss')
-  }
-  return dayjs(timestamp).format('MM-DD HH:mm')
+  return dayjs(timestamp).format('YYYY‑MM‑DD HH:mm:ss')
+
 }
 
 /** tooltip 数值格式化 */
@@ -217,7 +215,18 @@ function initTempHumidChart() {
   if (!tempHumidChartRef.value) return
   tempHumidChart = echarts.init(tempHumidChartRef.value)
   tempHumidChart.setOption({
-    tooltip: { trigger: 'axis', formatter: buildTooltipFormatter() },
+    tooltip: {
+      trigger: 'axis',
+      // 十字准星，出现横向+纵向辅助线
+      axisPointer: {
+        type: 'cross',
+        snap: true,
+        lineStyle: {
+          color: '#999',
+          type: 'dashed'
+        }
+      },
+      formatter: buildTooltipFormatter() },
     legend: {
       data: ['AHT20 温度', 'BMP280 温度', '湿度'],
       bottom: 0,
@@ -230,8 +239,17 @@ function initTempHumidChart() {
       axisLabel: {
         color: '#8C8C8C',
         fontSize: 11,
+        // rotate: 30,
         formatter: (value: number) => formatAxisLabel(value),
       },
+      // 每个时间节点画出垂直竖线
+      splitLine: {
+        show: true,
+        lineStyle: {
+          color: '#E8E8E3',
+          type: 'dashed'
+        }
+      }
     },
     yAxis: [
       {
@@ -313,7 +331,18 @@ function initPressureChart() {
   if (!pressureChartRef.value) return
   pressureChart = echarts.init(pressureChartRef.value)
   pressureChart.setOption({
-    tooltip: { trigger: 'axis', formatter: buildTooltipFormatter() },
+    tooltip: {
+      trigger: 'axis',
+      // 十字准星，出现横向+纵向辅助线
+      axisPointer: {
+        type: 'cross',
+        snap: true,
+        lineStyle: {
+          color: '#999',
+          type: 'dashed'
+        }
+      },
+      formatter: buildTooltipFormatter() },
     legend: { data: ['气压'], bottom: 0, textStyle: { color: '#8C8C8C' } },
     grid: { top: 20, right: 20, bottom: 40, left: 50 },
     xAxis: {
@@ -324,6 +353,14 @@ function initPressureChart() {
         fontSize: 11,
         formatter: (value: number) => formatAxisLabel(value),
       },
+      // 每个时间节点画出垂直竖线
+      splitLine: {
+        show: true,
+        lineStyle: {
+          color: '#E8E8E3',
+          type: 'dashed'
+        }
+      }
     },
     yAxis: {
       type: 'value',
