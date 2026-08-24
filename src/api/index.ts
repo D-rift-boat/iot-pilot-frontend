@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { ApiResponse } from './types/device'
 
 const request = axios.create({
-  baseURL: 'http://localhost:8080',
+  // baseURL: '/api',  不用写死 可nginx 根据url 路由
   timeout: 10000,
 })
 
