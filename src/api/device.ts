@@ -74,8 +74,8 @@ export function getDeviceHistory(
       '/api/sensorData/history',
       withCommonParams({
         deviceId,
-        startTime: formatDateTime(startTime),
-        endTime: formatDateTime(endTime),
+        startTime: startTime,
+        endTime: endTime,
       })
   )
 }
