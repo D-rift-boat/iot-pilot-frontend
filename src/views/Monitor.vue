@@ -15,6 +15,31 @@ let pressureChart: echarts.ECharts | null = null
 const DEVICE_ID = 'esp32-S3-001'
 const MAX_POINTS = 50
 
+// ========== 数据间隔连续修复：需要断开连续
+/** 数据点最大允许间隔（毫秒），超过则认为无数据，连线断开 */
+const MAX_GAP_MS = 5 * 60 * 1000
+
+/**
+ * 在数据点间隔过大时插入 null 点，打断 ECharts 连线
+ * connectNulls: false 时，遇到 null 点会自动断开
+ */
+function breakLargeGaps(data: DataPoint[], maxGapMs: number = MAX_GAP_MS): DataPoint[] {
+  if (data.length < 2) return data
+  const result: DataPoint[] = []
+  for (let i = 0; i < data.length; i++) {
+    result.push(data[i])
+    if (i < data.length - 1) {
+      const currentTime = data[i][0]
+      const nextTime = data[i + 1][0]
+      if (nextTime - currentTime > maxGapMs) {
+        // 紧接当前点后插入 null（+1ms），连线在此断开
+        result.push([currentTime + 1, null])
+      }
+    }
+  }
+  return result
+}
+
 // ==================== 时间范围状态 ====================
 type ViewMode = 'realtime' | 'custom'
 const timeRange = ref('1h')
@@ -82,6 +107,12 @@ async function fetchHistory(startTime: number, endTime: number) {
       pressureData.value = historyPoints.map(p =>
           [Number(p.reportTime), fix2(safeNum(p.pressureHpa))] as DataPoint
       )
+
+      // 关键：间隔过大处插入 null，打断连线
+      aht20TempData.value = breakLargeGaps(aht20TempData.value)
+      bmp280TempData.value = breakLargeGaps(bmp280TempData.value)
+      humidityData.value = breakLargeGaps(humidityData.value)
+      pressureData.value = breakLargeGaps(pressureData.value)
     } else {
       clearAllData()
     }
@@ -137,8 +168,17 @@ function pushData(msg: NonNullable<typeof data.value>) {
   const h = fix2(safeNum(msg.data.humidity))
   const p = fix2(safeNum(msg.data.pressureHpa))
 
-  // 全无效则跳过
   if (tAht === null && tBmp === null && h === null && p === null) return
+
+  // 关键：与最后一个有数据的点间隔过大时，先插入 null 断开
+  const lastPoint = aht20TempData.value[aht20TempData.value.length - 1]
+  if (lastPoint && lastPoint[1] !== null && time - lastPoint[0] > MAX_GAP_MS) {
+    const breakTime = lastPoint[0] + 1
+    aht20TempData.value.push([breakTime, null])
+    bmp280TempData.value.push([breakTime, null])
+    humidityData.value.push([breakTime, null])
+    pressureData.value.push([breakTime, null])
+  }
 
   aht20TempData.value.push([time, tAht])
   bmp280TempData.value.push([time, tBmp])
