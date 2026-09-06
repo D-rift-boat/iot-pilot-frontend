@@ -20,24 +20,26 @@ const MAX_POINTS = 50
 const MAX_GAP_MS = 5 * 60 * 1000
 
 /**
+ * 时序间隙断点处理
  * 在数据点间隔过大时插入 null 点，打断 ECharts 连线
  * connectNulls: false 时，遇到 null 点会自动断开
+ *  * @param points 原始数据 [timestamp, value]
+ *  * @param maxGapMs 当前聚合粒度最大允许间隔
  */
-function breakLargeGaps(data: DataPoint[], maxGapMs: number = MAX_GAP_MS): DataPoint[] {
-  if (data.length < 2) return data
-  const result: DataPoint[] = []
-  for (let i = 0; i < data.length; i++) {
-    result.push(data[i])
-    if (i < data.length - 1) {
-      const currentTime = data[i][0]
-      const nextTime = data[i + 1][0]
-      if (nextTime - currentTime > maxGapMs) {
-        // 紧接当前点后插入 null（+1ms），连线在此断开
-        result.push([currentTime + 1, null])
-      }
+function breakLargeGaps(points: DataPoint[], maxGapMs: number): DataPoint[] {
+  if (points.length < 2) return points
+  const res: DataPoint[] = []
+  res.push(points[0])
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]
+    const curr = points[i]
+    const diff = curr[0] - prev[0]
+    if (diff > maxGapMs) {
+      res.push([prev[0] + 1, null])
     }
+    res.push(curr)
   }
-  return result
+  return res
 }
 
 // ==================== 时间范围状态 ====================
@@ -48,12 +50,14 @@ const customRangeBound = ref<{ start: number; end: number } | null>(null)
 const viewMode = ref<ViewMode>('realtime')
 const currentRangeMs = ref(3_600_000)
 
-const RANGE_MAP: Record<string, number> = {
-  '10m': 600_000,
-  '1h': 3_600_000,
-  '6h': 21_600_000,
-  '24h': 86_400_000,
+// 与InfluxDB聚合策略完全对齐，原始设备上报周期5s
+const RANGE_CONFIG: Record<string, { rangeMs: number; maxGapMs: number }> = {
+  '10m': { rangeMs: 600_000, maxGapMs: 10_000 },
+  '1h': { rangeMs: 3_600_000, maxGapMs: 10_000 },
+  '6h': { rangeMs: 21_600_000, maxGapMs: 300_000 },
+  '24h': { rangeMs: 86_400_000, maxGapMs: 300_000 },
 }
+const currentMaxGapMs = ref(10_000)
 
 // ==================== 图表数据（[timestamp, value] 格式，适配 time 轴） ====================
 type DataPoint = [number, number | null]
@@ -92,7 +96,6 @@ async function fetchHistory(startTime: number, endTime: number) {
   try {
     const res = await getDeviceHistory(DEVICE_ID, startTime, endTime)
     const historyPoints = res.data.data
-
     if (historyPoints && historyPoints.length > 0) {
       aht20TempData.value = historyPoints.map(p =>
           [Number(p.reportTime), fix2(safeNum(p.temperatureAht))] as DataPoint
@@ -106,35 +109,56 @@ async function fetchHistory(startTime: number, endTime: number) {
       pressureData.value = historyPoints.map(p =>
           [Number(p.reportTime), fix2(safeNum(p.pressureHpa))] as DataPoint
       )
-
-      // 关键：间隔过大处插入 null，打断连线
-      aht20TempData.value = breakLargeGaps(aht20TempData.value)
-      bmp280TempData.value = breakLargeGaps(bmp280TempData.value)
-      humidityData.value = breakLargeGaps(humidityData.value)
-      pressureData.value = breakLargeGaps(pressureData.value)
+      // 使用当前动态的间隙阈值处理断点（快捷窗口 / 自定义窗口共用）
+      aht20TempData.value = breakLargeGaps(aht20TempData.value, currentMaxGapMs.value)
+      bmp280TempData.value = breakLargeGaps(bmp280TempData.value, currentMaxGapMs.value)
+      humidityData.value = breakLargeGaps(humidityData.value, currentMaxGapMs.value)
+      pressureData.value = breakLargeGaps(pressureData.value, currentMaxGapMs.value)
     } else {
       clearAllData()
     }
     updateCharts()
   } catch {
-    // 接口不可用时保持空图表，等待WS实时数据填充
+    clearAllData()
   }
 }
 
 /** 快捷范围加载（实时滚动模式） */
 function loadByRange(range: string) {
   viewMode.value = 'realtime'
-  currentRangeMs.value = RANGE_MAP[range] || 3_600_000
+  const cfg = RANGE_CONFIG[range]
+  currentRangeMs.value = cfg.rangeMs
+  currentMaxGapMs.value = cfg.maxGapMs
   const endTime = Date.now()
   const startTime = endTime - currentRangeMs.value
   fetchHistory(startTime, endTime)
 }
 
+/** 根据查询总跨度，自动计算对应的断档阈值（自定义时间窗口核心） */
+function calcMaxGapBySpan(spanMs: number): number {
+  const TWO_HOUR = 2 * 3600 * 1000
+  const TWO_DAY = 2 * 24 * 3600 * 1000
+  const THIRTY_DAY = 30 * 24 * 3600 * 1000
+
+  if (spanMs <= TWO_HOUR) {
+    return 10_000       // raw原始5s上报，>10s判定断档
+  } else if (spanMs <= TWO_DAY) {
+    return 300_000      // 5min聚合
+  } else if (spanMs <= THIRTY_DAY) {
+    return 3_600_000    // 1h聚合
+  } else {
+    return 86_400_000   // 1天聚合
+  }
+}
+
 /** 自定义时间段加载（固定范围，不自动滚动） */
 function loadByCustom(startTime: number, endTime: number) {
   viewMode.value = 'custom'
-  currentRangeMs.value = endTime - startTime
+  const spanMs = endTime - startTime
+  currentRangeMs.value = spanMs
   customRangeBound.value = { start: startTime, end: endTime }
+  // 根据跨度自动匹配断档阈值，和后端bucket保持一致
+  currentMaxGapMs.value = calcMaxGapBySpan(spanMs)
   fetchHistory(startTime, endTime)
 }
 
