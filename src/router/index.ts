@@ -31,7 +31,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  document.title = `${to.meta.title || 'Home'} - Home Pilot`
+  document.title = `${to.meta.title || 'Home'} - IoT‑Pilot`
 })
 
 export default router

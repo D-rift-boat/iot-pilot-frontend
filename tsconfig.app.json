@@ -6,7 +6,7 @@
     "allowArbitraryExtensions": true,
 
     /* Linting */
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,//TODO 生产环境 true
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
