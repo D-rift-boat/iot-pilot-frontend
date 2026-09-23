@@ -197,7 +197,7 @@ function pushData(msg: NonNullable<typeof data.value>) {
 
   // 关键：与最后一个有数据的点间隔过大时，先插入 null 断开
   const lastPoint = aht20TempData.value[aht20TempData.value.length - 1]
-  if (lastPoint && lastPoint[1] !== null && time - lastPoint[0] > MAX_GAP_MS) {
+  if (lastPoint && lastPoint[1] !== null && time - lastPoint[0] > currentMaxGapMs.value) {
     const breakTime = lastPoint[0] + 1
     aht20TempData.value.push([breakTime, null])
     bmp280TempData.value.push([breakTime, null])
@@ -210,15 +210,33 @@ function pushData(msg: NonNullable<typeof data.value>) {
   humidityData.value.push([time, h])
   pressureData.value.push([time, p])
 
-  // 保留最近 MAX_POINTS 个点
-  while (aht20TempData.value.length > MAX_POINTS) {
-    aht20TempData.value.shift()
-    bmp280TempData.value.shift()
-    humidityData.value.shift()
-    pressureData.value.shift()
-  }
+  // // 保留最近 MAX_POINTS 个点
+  // // -------- FIX BUG 这里增加判断！！只有实时滚动模式才做数组长度截断；自定义历史窗口禁止shift丢弃历史点
+  // if(viewMode.value === 'realtime'){
+  //   while (aht20TempData.value.length > MAX_POINTS) {
+  //     aht20TempData.value.shift()
+  //     bmp280TempData.value.shift()
+  //     humidityData.value.shift()
+  //     pressureData.value.shift()
+  //   }
+  // }
 
   updateCharts()
+
+  // 内存保护策略：只当总时长超过2倍窗口之后才清理最老的数据点
+  if(viewMode.value === 'realtime'){
+    const firstTs = aht20TempData.value[0]?.[0]
+    const latestTs = aht20TempData.value.at(-1)?.[0]
+    if(firstTs && latestTs && (latestTs - firstTs) > 2 * currentRangeMs.value){
+      // 丢掉头部超出两倍窗口的数据
+      while(aht20TempData.value[0]?.[0] < (latestTs - 2 * currentRangeMs.value)){
+        aht20TempData.value.shift()
+        bmp280TempData.value.shift()
+        humidityData.value.shift()
+        pressureData.value.shift()
+      }
+    }
+  }
 }
 
 // ==================== 图表初始化 ====================
